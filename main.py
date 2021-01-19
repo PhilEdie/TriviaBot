@@ -1,5 +1,9 @@
 
 import discord
+from discord.ext import commands
+from discord.ext.commands import Bot
+from discord.ext.commands.cooldowns import BucketType
+client = commands.Bot(command_prefix='?', help_command=None)
 import os
 import requests
 import random
@@ -11,7 +15,7 @@ class TriviaBot:
 
   def __init__(self):
     #INITIALISE FIELDS
-    
+
     self.info = requests.get("https://opentdb.com/api.php?amount=50&difficulty=medium&type=multiple")
     self.data = self.info.json()      #CONTAINS ALL POSSIBLE DATA.
     self.questions = []               #CONTAINS ALL POSSIBLE QUESTIONS.
@@ -29,7 +33,8 @@ class TriviaBot:
  
 #-------------Main Program---------------#
 
-client = discord.Client()
+#client = discord.Client()
+
 trivia_bot = TriviaBot()
 
 
@@ -37,31 +42,32 @@ trivia_bot = TriviaBot()
 @client.event
 async def on_ready():
   print("TriviaBot is here!")
-  
+
+@client.command()
+@commands.cooldown(1, 4, commands.BucketType.user)  ##PUTS A 4 SECOND COOLDOWN ON THE COMMAND.
+async def trivia(ctx):
+  reset_q_a()
+  question = get_trivia_question()
+  #SENDS THE QUESTION TO DISCORD
+  await ctx.channel.send(question)
+    
+  #LOOPS THROUGH ALL ANSWERS AND PRINTS EACH ANSWER ON INDIVIDUAL lINES.
+  #ALL ANSWERS ARE NUMBERED. 
+  for i in range(0, len(trivia_bot.possible_answers)):
+    await ctx.channel.send(str(i + 1) + ":  "+ str(trivia_bot.possible_answers[i]))
+  #RESETS THE COOLDOWN TIMER. 
+  #SETS ASKING A QUESTION TO TRUE. THE BOT WILL NOW LOOK FOR MESSAGES THAT MATCH THE ANSWERS.
+  trivia_bot.asking_a_question = True
+
+
 
 # EVENT LISTENER FOR WHEN A NEW MESSAGE IS SENT TO A CHANNEL.
 @client.event
 async def on_message(message):
-  
   #IGNORES THE BOTS OWN MESSAGES.
   if message.author == client.user:
     return
-
-  #IF IT HAS BEEN 5 SECONDS SINCE THE LAST COMMAND AND ?trivia IS CALLED:
-  if time.time() - trivia_bot.last_command > 5 and message.content == "?trivia":
-      reset_q_a()
-      question = get_trivia_question()
-      #SENDS THE QUESTION TO DISCORD
-      await message.channel.send(question)
-      #LOOPS THROUGH ALL ANSWERS AND PRINTS EACH ANSWER ON INDIVIDUAL lINES.
-      #ALL ANSWERS ARE NUMBERED. 
-      for i in range(0, len(trivia_bot.possible_answers)):
-        await message.channel.send(str(i + 1) + ":  "+ str(trivia_bot.possible_answers[i]))
-      #SETS ASKING A QUESTION TO TRUE. THE BOT WILL NOW LOOK FOR MESSAGES THAT MATCH THE ANSWERS.
-      trivia_bot.asking_a_question = True
-      #RESETS THE COOLDOWN TIMER. 
-      trivia_bot.last_command = time.time()
-    
+         
   #CHECKS ANSWER. IGNORING CASE.
   if trivia_bot.asking_a_question and message.content.lower() in get_stripped_trivia_answers():
     if message.content.lower() == trivia_bot.correct_answer.lower():
@@ -81,6 +87,8 @@ async def on_message(message):
       else:
         await message.channel.send("Incorrect. Answer was: " + str(trivia_bot.correct_answer))
       trivia_bot.asking_a_question = False
+  #ALLOWS FOR COMMANDS AND MESSAGES TO BE USED TOGETHER.
+  await client.process_commands(message)
 
 
 
