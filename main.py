@@ -16,13 +16,8 @@ class TriviaBot:
 
   def __init__(self, difficulty):
     self.difficulty = difficulty
-    
-    if difficulty == "random":
-      self.info = requests.get("https://opentdb.com/api.php?amount=50&type=multiple")
-    else: 
-      self.info = requests.get("https://opentdb.com/api.php?amount=50{}&type=multiple".format("&difficulty=" + difficulty))
-
-    self.data = self.info.json()      #CONTAINS ALL POSSIBLE DATA.
+    self.info = None                  
+    self.data = None                  #CONTAINS ALL POSSIBLE DATA.
     self.questions = []               #CONTAINS ALL POSSIBLE QUESTIONS.
     self.question_to_answer = {}      #MAPS EACH QUESTION TO ITS CORRESPONDING ANSWER
     self.question_index = 0           #INDEX OF THE QUESTION WITHIN THE data FIELD
@@ -30,13 +25,32 @@ class TriviaBot:
     self.correct_answer = ""          #TRACKS THE CURRENT CORRECT ANSWER
     self.possible_answers = []        #TRACKS THE FOUR ANSWERS.
     self.numbered_answers = {}        #DICTIONARY WHICH MAPS EACH QUESTIONS NUMBER TO AN ANSWER. 
+    self.get_new_data(self.difficulty)
+    
+
+  """
+    Requests new data from OpenTDB. Resets fields. Updates questions list and question to answer dictionary.   
+  """  
+  def get_new_data(self, difficulty):
+    if difficulty == "random":
+      self.info = requests.get("https://opentdb.com/api.php?amount=50&type=multiple")
+    else: 
+      self.info = requests.get("https://opentdb.com/api.php?amount=50{}&type=multiple".format("&difficulty=" + difficulty))
+
+    self.data = self.info.json()      
+    self.questions = []               
+    self.question_to_answer = {}      
+    self.question_index = 0           
+    self.is_asking_a_question = False    
+    self.correct_answer = ""          
+    self.possible_answers = []        
+    self.numbered_answers = {}         
     
     for result in self.data["results"]:
       question = self.decode_html(result['question'])
       correct_answer = self.decode_html(result['correct_answer'])
       self.questions.append(question)
       self.question_to_answer.update({question : correct_answer})
-    
 
   """
     Converts HTML syntax to readable text and returns it. 
@@ -63,10 +77,13 @@ class TriviaBot:
 
 
   """
-    Randomises the question index. Updates the correct_answer, numbered_answers, and possible_answers fields. 
+    Increases the question index by 1. If the question index is greater than the length of the questions field, loads new data.
   """
   def new_question(self):
-    self.question_index = random.randint(0, len(self.questions))
+    if self.question_index < len(self.questions) -1:
+      self.question_index += 1
+    else:
+      self.get_new_data(self.difficulty)
     self.reset_possible_answers()
 
   """
@@ -87,6 +104,7 @@ class TriviaBot:
 #-------------Main Program---------------#
 
 #INITIALISES WITH A NEW trivia_bot OBJECT.
+
 difficulty = "random"
 trivia_bot = TriviaBot(difficulty)
 
