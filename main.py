@@ -1,7 +1,6 @@
 
 import discord
 from discord.ext import commands, tasks
-from discord.ext import commands
 from discord.ext.commands import Bot
 from discord.ext.commands.cooldowns import BucketType
 
@@ -64,6 +63,13 @@ class TriviaBot:
   def get_trivia_question(self):
     return self.questions[self.question_index]
 
+
+  """
+    Returns the current difficulty. 
+  """
+  def get_difficulty(self):
+    return self.difficulty
+
   """
     Returns a shuffled list of possible answers based on the current question number.
   """
@@ -77,7 +83,8 @@ class TriviaBot:
 
 
   """
-    Increases the question index by 1. If the question index is greater than the length of the questions field, loads new data.
+    Increases the question index by 1. 
+    If the question index is greater than the length of the questions field, loads new data.
   """
   def new_question(self):
     if self.question_index < len(self.questions) -1:
@@ -105,30 +112,40 @@ class TriviaBot:
 
 #INITIALISES WITH A NEW trivia_bot OBJECT.
 
-difficulty = "random"
-trivia_bot = TriviaBot(difficulty)
+bot_instances = {}    #DICTIONARY WHICH MAPS GUILD.ID TO TRIVIABOT OBJECT
+
 
 # EVENT LISTENER FOR WHEN THE BOT HAS SWITCHED FROM OFFLINE TO ONLINE.
 @client.event
 async def on_ready():
-  print("TriviaBot is here!")
+  for guild in client.guilds:
+    if guild.id not in bot_instances.keys():
+      bot_instances[guild.id] = TriviaBot("random")
+      print("Added bot to dictionary: ", str(guild.id))
+  print("Bot is ready!")
+  
+
 
 """
   Loads a new trivia question. Prints the new question and its possible answers. 
 """
 @client.command()
-@commands.cooldown(1, 4, commands.BucketType.user)  ##PUTS A 4 SECOND COOLDOWN ON THE COMMAND.
+@commands.cooldown(1, 4, commands.BucketType.channel)  ##PUTS A 4 SECOND COOLDOWN ON THE COMMAND.
 async def trivia(ctx):
-  trivia_bot.new_question()
-  question = trivia_bot.get_trivia_question()
+  id = ctx.message.guild.id
+  bot = bot_instances[id]
+
+  bot.new_question()
+  question = bot.get_trivia_question()
   #SENDS THE QUESTION TO DISCORD
   await ctx.channel.send(question)
   #LOOPS THROUGH ALL ANSWERS AND PRINTS EACH ANSWER ON INDIVIDUAL lINES.
   #ALL ANSWERS ARE NUMBERED. 
-  for answer in range(0, len(trivia_bot.possible_answers)):
-    await ctx.channel.send(str(answer + 1) + ":  "+ str(trivia_bot.possible_answers[answer]))
+  for answer in range(0, len(bot.possible_answers)):
+    await ctx.channel.send(str(answer + 1) + ":  "+ str(bot.possible_answers[answer]))
   #SETS ASKING A QUESTION TO TRUE. THE BOT WILL NOW LOOK FOR MESSAGES THAT MATCH THE ANSWERS.
-  trivia_bot.is_asking_a_question = True
+  bot.is_asking_a_question = True
+
 
 
 """
@@ -137,9 +154,13 @@ async def trivia(ctx):
 @client.command()
 @commands.cooldown(1, 4, commands.BucketType.user)
 async def reload(ctx):
-  global trivia_bot
-  trivia_bot = TriviaBot(difficulty)
+  id = ctx.message.guild.id
+  bot = bot_instances[id]
+
+  difficulty = bot.get_difficulty()
+  bot = TriviaBot(difficulty)
   await ctx.channel.send("Loaded 50 new random trivia questions.")
+
 
 """
   Creates a new instance of trivia_bot with a specified difficulty. 
@@ -147,8 +168,9 @@ async def reload(ctx):
 @client.command()
 @commands.cooldown(1, 4, commands.BucketType.user)
 async def difficulty(ctx, *args):
-  global trivia_bot
-  global difficulty
+  id = ctx.message.guild.id
+  bot = bot_instances[id]
+
   possible_difficulties = ["random", "easy", "medium", "hard"]
 
   if len(args) == 0:
@@ -157,7 +179,7 @@ async def difficulty(ctx, *args):
 
   elif args[0].lower() in possible_difficulties:
     selected_difficulty = args[0].lower()
-    trivia_bot = TriviaBot(selected_difficulty)
+    bot = TriviaBot(selected_difficulty)
     await ctx.channel.send("Difficulty changed to " + selected_difficulty.capitalize() + ".")
 
   else:
@@ -171,18 +193,20 @@ async def difficulty(ctx, *args):
 async def on_message(message):
   #IGNORES THE BOTS OWN MESSAGES.
   if message.author == client.user:
-    return   
+    return
+  id = message.guild.id  
+  bot = bot_instances[id] 
     
   #CHECKS IF USER ENTERED A NUMBER.   
-  if trivia_bot.is_asking_a_question  and message.content.isdigit():
+  if bot.is_asking_a_question  and message.content.isdigit():
     #CHECKS IF NUMBER IS A 1, 2, 3, or 4. 
     if int(message.content) in range(1,5):
       #CHECKS IF THE NUMBER CORRESPONDS TO THE CORRECT ANSWER.
-      if trivia_bot.numbered_answers[int(message.content) - 1] == trivia_bot.correct_answer:
+      if bot.numbered_answers[int(message.content) - 1] == bot.correct_answer:
         await message.channel.send("Correct!")
       else:
-        await message.channel.send("Incorrect. Answer was: " + str(trivia_bot.correct_answer))
-      trivia_bot.is_asking_a_question = False
+        await message.channel.send("Incorrect. Answer was: " + str(bot.correct_answer))
+      bot.is_asking_a_question = False
   #ALLOWS FOR COMMANDS AND MESSAGES TO BE USED TOGETHER.
   await client.process_commands(message)
 
