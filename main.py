@@ -5,11 +5,13 @@ from discord.ext.commands import Bot
 from discord.ext.commands.cooldowns import BucketType
 
 client = commands.Bot(command_prefix='?', help_command=None)
+
 import os
 import requests
 import random
 from keep_running import keep_running
 import html
+import json
 
 class TriviaBot:
 
@@ -27,10 +29,11 @@ class TriviaBot:
     self.get_new_data(self.difficulty)
     
 
-  """
-    Requests new data from OpenTDB. Resets fields. Updates questions list and question to answer dictionary.   
-  """  
+  
   def get_new_data(self, difficulty):
+    """
+    Requests new data from OpenTDB. Resets fields. Updates questions list and question to answer dictionary.   
+    """  
     if difficulty == "random":
       self.info = requests.get("https://opentdb.com/api.php?amount=50&type=multiple")
     else: 
@@ -51,29 +54,25 @@ class TriviaBot:
       self.questions.append(question)
       self.question_to_answer.update({question : correct_answer})
 
-  """
-    Converts HTML syntax to readable text and returns it. 
-  """
+  
   def decode_html(self, html_string):
+    """Converts HTML syntax to readable text and returns it."""
     return html.unescape(html_string)
 
-  """
-    Returns the current question.
-  """  
+  
   def get_trivia_question(self):
+    """Returns the current question."""  
     return self.questions[self.question_index]
 
 
-  """
-    Returns the current difficulty. 
-  """
+  
   def get_difficulty(self):
+    """Returns the current difficulty."""
     return self.difficulty
 
-  """
-    Returns a shuffled list of possible answers based on the current question number.
-  """
+ 
   def get_shuffled_trivia_answers(self):
+    """Returns a shuffled list of possible answers based on the current question number."""
     answers = []
     answers.append(self.decode_html(self.correct_answer))
     for incorrect in self.data['results'][self.question_index]['incorrect_answers']:
@@ -82,21 +81,21 @@ class TriviaBot:
     return answers
 
 
-  """
+  
+  def new_question(self):
+    """
     Increases the question index by 1. 
     If the question index is greater than the length of the questions field, loads new data.
-  """
-  def new_question(self):
+    """
     if self.question_index < len(self.questions) -1:
       self.question_index += 1
     else:
       self.get_new_data(self.difficulty)
     self.reset_possible_answers()
 
-  """
-    Updates the correct_answer, numbered_answers, and possible_answers fields. 
-  """
+  
   def reset_possible_answers(self):
+    """Updates the correct_answer, numbered_answers, and possible_answers fields."""
     self.correct_answer = self.question_to_answer[self.get_trivia_question()]
     #RESETS THE NUMBERED ANSWERS DICTIONARY
     self.numbered_answers = {}
@@ -125,13 +124,29 @@ async def on_ready():
   print("Bot is ready!")
   
 
+@client.command()
+async def help(ctx):
+  """Sends the user a private message explaining how to use each of the commands."""
 
-"""
-  Loads a new trivia question. Prints the new question and its possible answers. 
-"""
+  author = ctx.message.author
+  embed = discord.Embed(colour = discord.Colour.orange())
+  embed.set_author(name='Help')
+  embed.add_field(name='?trivia', value= 'Generates a new trivia question. You can skip a question by calling the trivia command again.', inline=False)
+  embed.add_field(name='?difficulty', value= 'Sets the difficulty of the trivia questions. The available difficulties are Easy, Medium, Hard, or Random.', inline=False)
+
+  await author.send(embed=embed)
+
+
+
+
+
 @client.command()
 @commands.cooldown(1, 4, commands.BucketType.channel)  ##PUTS A 4 SECOND COOLDOWN ON THE COMMAND.
 async def trivia(ctx):
+  """
+  Loads a new trivia question. Prints the new question and its possible answers. 
+  """
+
   id = ctx.message.guild.id
   bot = bot_instances[id]
 
@@ -148,12 +163,12 @@ async def trivia(ctx):
 
 
 
-"""
-  Creates a new instance of trivia_bot.
-"""
+
 @client.command()
 @commands.cooldown(1, 4, commands.BucketType.user)
 async def reload(ctx):
+  """Creates a new instance of trivia_bot."""
+  
   id = ctx.message.guild.id
   bot = bot_instances[id]
 
@@ -162,12 +177,12 @@ async def reload(ctx):
   await ctx.channel.send("Loaded 50 new random trivia questions.")
 
 
-"""
-  Creates a new instance of trivia_bot with a specified difficulty. 
-"""
+
 @client.command()
 @commands.cooldown(1, 4, commands.BucketType.user)
 async def difficulty(ctx, *args):
+  """Creates a new instance of trivia_bot with a specified difficulty."""
+
   id = ctx.message.guild.id
   bot = bot_instances[id]
 
@@ -186,11 +201,12 @@ async def difficulty(ctx, *args):
     await ctx.channel.send("Invalid difficulty. Please use Random, Easy, Medium, or Hard.")
 
   
-"""
-  Event listener for when a message is sent to a channel. Active when trivia_bot is currently asking a question. 
-"""
+
 @client.event
 async def on_message(message):
+  """
+  Event listener for when a message is sent to a channel. Active when trivia_bot is currently asking a question. 
+  """
   #IGNORES THE BOTS OWN MESSAGES.
   if message.author == client.user:
     return
