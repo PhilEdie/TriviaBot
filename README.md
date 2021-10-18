@@ -1,3 +1,5 @@
+![triviabot example](https://user-images.githubusercontent.com/58746884/137691694-6d376f69-589e-4135-812e-ac8236bd9b5a.PNG)
+
 # TriviaBot
 A Discord bot which generates random multi-choice trivia questions.
 
